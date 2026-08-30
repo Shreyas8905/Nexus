@@ -1,0 +1,26 @@
+:root {
+  --bg: #0b0f14;
+  --bg-elev: #121820;
+  --line: rgba(212, 175, 106, 0.18);
+  --gold: #d4af6a;
+  --gold-2: #f0d9a6;
+  --text: #e8eef6;
+  --muted: #8b97a8;
+  --danger: #e07a6e;
+  --ok: #7dcea0;
+  --font: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+  --sans: "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(212, 175, 106, 0.12), transparent 50%),
+    radial-gradient(900px 500px at 100% 0%, rgba(70, 110, 160, 0.12), transparent 45%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+a { color: var(--gold); }

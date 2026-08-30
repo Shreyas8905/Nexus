@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+node_modules
+.next
+**/__pycache__
+**/*.pyc
+data
+*.md
+eval
+apps/chat/.next
+apps/admin/.next
