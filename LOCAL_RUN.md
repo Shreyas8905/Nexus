@@ -9,6 +9,7 @@ This guide describes how to run the Nexus project natively on your system.
   - Qdrant: `localhost:6333`
   - Postgres: `localhost:5432`
   - Redis: `localhost:6379`
+  - Ollama: `localhost:11434` (Required for embeddings)
 
 ## 1. Backend Setup
 
@@ -17,7 +18,7 @@ Create a `.env` file in the `backend/` directory:
 
 ```env
 # Database
-DATABASE_URL=postgresql+asyncpg://nexus:change-this-db-password@localhost:5432/nexus
+DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/nexus_db
 
 # Cache & Vector Store
 REDIS_URL=redis://localhost:6379/0
@@ -29,16 +30,32 @@ GROQ_API_KEY=your_groq_api_key_here
 GROQ_LLM_MODEL=llama-3.1-70b-versatile
 GEMINI_API_KEY=your_gemini_api_key_here
 
+# Ollama (Required for embeddings)
+OLLAMA_URL=http://127.0.0.1:11434
+
 # Security & Auth
 JWT_SECRET=your-secure-secret
 ```
 
 ### Installation and Execution
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
+1. **Install Dependencies**:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+2. **Pull Embedding Model**:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+3. **Start API**:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+4. **Start Worker** (In a NEW terminal window):
+   ```bash
+   cd backend
+   python -m app.worker
+   ```
 
 ## 2. Frontend Setup
 
@@ -48,7 +65,7 @@ cd apps/chat
 npm install
 npm run dev
 ```
-The chat app will be available at `http://localhost:3000`.
+Available at: `http://localhost:3000`
 
 ### Admin Frontend
 ```bash
@@ -56,9 +73,11 @@ cd apps/admin
 npm install
 npm run dev
 ```
-The admin app will be available at `http://localhost:3001`.
+Available at: `http://localhost:3001`
 
 ## How it Works
 - **API Proxying**: The frontends use Next.js `rewrites` to proxy all `/api` requests to the backend running at `http://localhost:8000`.
-- **LLM Provider**: Setting `LLM_PROVIDER=groq` in the backend `.env` switches the text generation to Groq API.
-- **Embeddings & Vision**: These now use the Google Gemini API (`GEMINI_API_KEY`), removing the need for a local Ollama instance.
+- **Hybrid LLM Strategy**: 
+  - **Generation**: Handled by Groq API for speed and quality.
+  - **Vision**: Handled by Google Gemini API.
+  - **Embeddings**: Handled by local Ollama for stability and zero-cost.

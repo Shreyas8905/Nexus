@@ -13,7 +13,6 @@ http://localhost:8080 {
 		-Server
 	}
 	handle /api/* {
-		uri strip_prefix /api
 		reverse_proxy api:8000
 	}
 	handle {
@@ -31,7 +30,6 @@ http://localhost:8081 {
 		-Server
 	}
 	handle /api/* {
-		uri strip_prefix /api
 		reverse_proxy api:8000
 	}
 	handle {
