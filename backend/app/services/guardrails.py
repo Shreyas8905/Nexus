@@ -5,7 +5,7 @@ import re
 from typing import Literal
 
 from app.models import Role, Visibility
-from app.services.ollama_client import generate
+from app.services.llm_client import generate
 
 Decision = Literal["allow", "refuse"]
 

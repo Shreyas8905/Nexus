@@ -12,7 +12,7 @@ from openpyxl import load_workbook
 from PIL import Image
 import pytesseract
 
-from app.services.ollama_client import caption_image
+from app.services.llm_client import caption_image
 
 
 @dataclass

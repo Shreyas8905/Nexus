@@ -14,7 +14,7 @@ from app.schemas import ChatRequest
 from app.security import cache_key
 from app.services.audit import audit
 from app.services.guardrails import REFUSAL, input_guard, scrub_output
-from app.services.ollama_client import generate_stream
+from app.services.llm_client import generate_stream
 from app.services.queue import get_cached, rate_limit, set_cached
 from app.services.retrieve import retrieve
 

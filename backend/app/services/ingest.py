@@ -9,7 +9,7 @@ from app.db import SessionLocal
 from app.models import Chunk, DocStatus, Document
 from app.services.chunking import chunk_blocks
 from app.services.classify import classify_blocks
-from app.services.ollama_client import embed_texts
+from app.services.llm_client import embed_texts
 from app.services.parse import parse_file
 from app.services.qdrant_store import delete_document, upsert_chunks
 

@@ -17,12 +17,12 @@ class TokenUser(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
 class ExternalStartRequest(BaseModel):
-    email: EmailStr
+    email: str
 
 
 class ChangePasswordRequest(BaseModel):
@@ -31,7 +31,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class CreateInternalUserRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str = Field(min_length=12)
 
 

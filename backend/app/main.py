@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
@@ -46,10 +46,13 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-CSRF-Token", "X-Nexus-Site"],
 )
 
-app.include_router(auth.router)
-app.include_router(admin_users.router)
-app.include_router(admin_docs.router)
-app.include_router(chat.router)
+# Create a master router for all API endpoints to support /api prefix
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth.router)
+api_router.include_router(admin_users.router)
+api_router.include_router(admin_docs.router)
+api_router.include_router(chat.router)
+app.include_router(api_router)
 
 
 @app.get("/health")

@@ -6,7 +6,7 @@ from uuid import UUID
 from app.models import Role, Visibility
 from app.schemas import Citation
 from app.services.guardrails import allowed_visibilities
-from app.services.ollama_client import embed_texts
+from app.services.llm_client import embed_texts
 from app.services.qdrant_store import search
 
 
