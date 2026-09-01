@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Project Nexus! This project is a collaborative effort for the Department of AI & ML, DSCE.
 
-## 🛠️ Developer Setup
+## Developer Setup
 
 ### Backend Developers
 The backend is built with FastAPI and focuses on the RAG pipeline.
@@ -38,7 +38,7 @@ The frontends are built with Next.js (App Router).
 - `apps/chat/app/page.js`: The main chat interface and streaming logic.
 - `apps/admin/app/page.js`: The document management and user control panel.
 
-## 📜 Contribution Guidelines
+## Contribution Guidelines
 
 ### 1. Feature Requests
 Please open an issue describing the feature and how it benefits the DSCE AI & ML department.
@@ -54,5 +54,5 @@ Before submitting a PR:
 - Ensure that document ingestion completes without errors in the worker logs.
 - Verify that citations are correctly rendered in the chat UI.
 
-## 🤝 Support
+## Support
 For architectural questions, please refer to the `README.md` or contact the lead maintainers of the AI & ML Department.
