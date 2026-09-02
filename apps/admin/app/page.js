@@ -19,19 +19,38 @@ async function api(path, opts = {}) {
   return data;
 }
 
-const STEPS = ["queued", "parsing", "chunking", "embedding", "ready", "failed"];
+const TABS = [
+  { key: "docs", label: "Documents" },
+  { key: "internal", label: "Internal users" },
+  { key: "external", label: "External visitors" },
+];
+
+const STATUS_LABEL = {
+  queued: "Queued",
+  parsing: "Parsing",
+  chunking: "Chunking",
+  embedding: "Embedding",
+  ready: "Ready",
+  failed: "Failed",
+};
 
 export default function AdminPage() {
   const [me, setMe] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [email, setEmail] = useState("admin@nexus.local");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [tab, setTab] = useState("docs");
   const [docs, setDocs] = useState([]);
   const [internals, setInternals] = useState([]);
   const [externals, setExternals] = useState([]);
   const [newEmail, setNewEmail] = useState("");
   const [newPass, setNewPass] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   async function loadMe() {
     try {
@@ -40,6 +59,8 @@ export default function AdminPage() {
       setMe(d.user);
     } catch {
       setMe(null);
+    } finally {
+      setCheckingAuth(false);
     }
   }
 
@@ -68,217 +89,361 @@ export default function AdminPage() {
   async function login(e) {
     e.preventDefault();
     setError("");
+    setSigningIn(true);
     try {
       await api("/auth/admin/login", { method: "POST", json: { email, password } });
       await loadMe();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSigningIn(false);
     }
   }
 
   async function upload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploading(true);
     const fd = new FormData();
     fd.append("file", file);
     const vis = document.getElementById("vis").value;
     if (vis) fd.append("visibility", vis);
-    const res = await fetch("/api/admin/documents", {
-      method: "POST",
-      credentials: "include",
-      headers: { "X-CSRF-Token": csrf(), "X-Nexus-Site": "admin" },
-      body: fd,
-    });
-    if (!res.ok) setError("Upload failed");
-    e.target.value = "";
-    await refresh();
+    try {
+      const res = await fetch("/api/admin/documents", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": csrf(), "X-Nexus-Site": "admin" },
+        body: fd,
+      });
+      if (!res.ok) setError("Upload failed");
+      await refresh();
+    } finally {
+      e.target.value = "";
+      setUploading(false);
+    }
   }
 
   async function removeDoc(id) {
     if (!confirm("Remove this document from the knowledge base?")) return;
-    await api(`/admin/documents/${id}`, { method: "DELETE" });
-    await refresh();
+    setRemovingId(id);
+    try {
+      await api(`/admin/documents/${id}`, { method: "DELETE" });
+      await refresh();
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   async function createUser(e) {
     e.preventDefault();
-    await api("/admin/users/internal", { method: "POST", json: { email: newEmail, password: newPass } });
-    setNewEmail("");
-    setNewPass("");
-    await refresh();
+    setCreatingUser(true);
+    try {
+      await api("/admin/users/internal", { method: "POST", json: { email: newEmail, password: newPass } });
+      setNewEmail("");
+      setNewPass("");
+      await refresh();
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function toggleUser(u) {
+    setTogglingId(u.id);
+    try {
+      await api(`/admin/users/${u.id}/${u.is_active ? "disable" : "enable"}`, { method: "POST" });
+      await refresh();
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="nx-checking">
+        <div className="nx-spinner" />
+        <span>Checking your session…</span>
+      </div>
+    );
   }
 
   if (!me) {
     return (
-      <main style={{ maxWidth: 380, margin: "18vh auto", padding: 24 }}>
-        <h1 style={{ fontWeight: 560, letterSpacing: "0.08em" }}>NEXUS ADMIN</h1>
-        <p style={{ color: "var(--muted)" }}>Minimal control plane for users and ingestion.</p>
-        <form onSubmit={login} style={{ display: "grid", gap: 10 }}>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" style={inp} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" style={inp} />
-          <button style={btn}>Sign in</button>
-          {error && <p style={{ color: "var(--bad)" }}>{error}</p>}
-        </form>
+      <main className="nx-auth-wrap">
+        <div className="nx-auth-card">
+          <div className="nx-brand">
+            <span className="nx-brand-mark">N</span>
+            <div>
+              <h1 className="nx-brand-text">Nexus</h1>
+              <p className="nx-brand-sub">Administration console for knowledge base ingestion and access control.</p>
+            </div>
+          </div>
+          <form onSubmit={login} className="nx-form">
+            <label className="nx-field">
+              <span>Email</span>
+              <input
+                className="nx-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@organization.com"
+                autoComplete="username"
+              />
+            </label>
+            <label className="nx-field">
+              <span>Password</span>
+              <input
+                className="nx-input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </label>
+            <button className="nx-btn nx-btn-primary" disabled={signingIn}>
+              {signingIn ? "Signing in…" : "Sign in"}
+            </button>
+            {error && <p className="nx-error">{error}</p>}
+          </form>
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-      <header style={{ display: "flex", gap: 16, alignItems: "baseline", marginBottom: 22 }}>
-        <h1 style={{ margin: 0, fontSize: 22, letterSpacing: "0.12em" }}>NEXUS ADMIN</h1>
-        <span style={{ color: "var(--muted)", fontSize: 13 }}>{me.email}</span>
-        {me.must_change_password && <span style={{ color: "var(--warn)", fontSize: 13 }}>Change the bootstrap password.</span>}
-      </header>
-      <nav style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {["docs", "internal", "external"].map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={{ ...btn, background: tab === t ? "#1f6feb" : "#21262d" }}>
-            {t === "docs" ? "Documents" : t === "internal" ? "Internal users" : "External visitors"}
-          </button>
-        ))}
-      </nav>
-
-      {tab === "docs" && (
-        <section>
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
-            <select id="vis" defaultValue="" style={inp}>
-              <option value="">Auto-classify</option>
-              <option value="generic">generic</option>
-              <option value="internal">internal</option>
-              <option value="restricted_pii">restricted_pii</option>
-            </select>
-            <label style={{ ...btn, display: "inline-block" }}>
-              Upload
-              <input type="file" hidden onChange={upload} />
-            </label>
+    <div className="nx-app">
+      <div className="nx-header-rule" />
+      <header className="nx-header">
+        <div className="nx-header-inner">
+          <div className="nx-header-brand">
+            <span className="nx-brand-mark small">N</span>
+            <h1>
+              Nexus<span>Administration</span>
+            </h1>
           </div>
-          <table style={table}>
-            <thead>
-              <tr>
-                <th>File</th>
-                <th>Visibility</th>
-                <th>Status</th>
-                <th>Chunks</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {docs.map((d) => (
-                <tr key={d.id}>
-                  <td>{d.filename}</td>
-                  <td>{d.visibility}{d.visibility_override ? " *" : ""}</td>
-                  <td>
-                    <div style={{ fontSize: 12, color: d.status === "failed" ? "var(--bad)" : "var(--muted)" }}>
-                      {d.status} · {d.progress_step} {d.progress_pct}%
-                    </div>
-                    <div style={bar}>
-                      <div
-                        style={{
-                          width: `${d.progress_pct}%`,
-                          height: 6,
-                          background: d.status === "failed" ? "var(--bad)" : d.status === "ready" ? "var(--ok)" : "var(--accent)",
-                          borderRadius: 99,
-                        }}
-                      />
-                    </div>
-                    {d.error && <div style={{ color: "var(--bad)", fontSize: 12 }}>{d.error}</div>}
-                  </td>
-                  <td>{d.chunk_count}</td>
-                  <td>
-                    <button style={{ ...btn, background: "#3d1f1f" }} onClick={() => removeDoc(d.id)}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+          <div className="nx-header-meta">
+            {me.must_change_password && <span className="nx-badge-warn">Change the bootstrap password</span>}
+            <span className="nx-user-email">{me.email}</span>
+          </div>
+        </div>
+        <nav className="nx-nav">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`nx-nav-btn${tab === t.key ? " active" : ""}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </header>
 
-      {tab === "internal" && (
-        <section>
-          <form onSubmit={createUser} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <input style={inp} placeholder="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
-            <input style={inp} placeholder="temp password (12+ chars)" value={newPass} onChange={(e) => setNewPass(e.target.value)} required minLength={12} />
-            <button style={btn}>Create</button>
-          </form>
-          <table style={table}>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Active</th>
-                <th>Queries</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {internals.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.email}</td>
-                  <td>{u.is_active ? "yes" : "no"}</td>
-                  <td>{u.query_count}</td>
-                  <td>
-                    <button
-                      style={btn}
-                      onClick={async () => {
-                        await api(`/admin/users/${u.id}/${u.is_active ? "disable" : "enable"}`, { method: "POST" });
-                        await refresh();
-                      }}
-                    >
-                      {u.is_active ? "Disable" : "Enable"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+      <main className="nx-main">
+        {tab === "docs" && (
+          <section>
+            <div className="nx-section-head">
+              <div>
+                <h2>Documents</h2>
+                <p>Files ingested into the knowledge base and their processing status.</p>
+              </div>
+            </div>
+            <div className="nx-card">
+              <div className="nx-toolbar">
+                <select id="vis" defaultValue="" className="nx-input nx-select">
+                  <option value="">Auto-classify</option>
+                  <option value="generic">Generic</option>
+                  <option value="internal">Internal</option>
+                  <option value="restricted_pii">Restricted (PII)</option>
+                </select>
+                <label className="nx-upload-label">
+                  {uploading ? "Uploading…" : "Upload document"}
+                  <input type="file" hidden onChange={upload} disabled={uploading} />
+                </label>
+              </div>
 
-      {tab === "external" && (
-        <table style={table}>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Last seen</th>
-              <th>Queries</th>
-              <th>Active</th>
-            </tr>
-          </thead>
-          <tbody>
-            {externals.map((u) => (
-              <tr key={u.id}>
-                <td>{u.email}</td>
-                <td>{u.last_seen_at ? new Date(u.last_seen_at).toLocaleString() : "—"}</td>
-                <td>{u.query_count}</td>
-                <td>{u.is_active ? "yes" : "no"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
+              {docs.length === 0 ? (
+                <div className="nx-empty">
+                  <div className="nx-empty-mark">N</div>
+                  <p>No documents yet. Upload a file to start building the knowledge base.</p>
+                </div>
+              ) : (
+                <div className="nx-table-scroll">
+                  <table className="nx-table">
+                    <thead>
+                      <tr>
+                        <th>File</th>
+                        <th>Visibility</th>
+                        <th>Status</th>
+                        <th>Chunks</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map((d) => (
+                        <tr key={d.id}>
+                          <td className="nx-col-file">{d.filename}</td>
+                          <td>
+                            <span className={`nx-pill nx-pill-${d.visibility}`}>
+                              {d.visibility}
+                              {d.visibility_override && <span className="nx-pill-star">*</span>}
+                            </span>
+                          </td>
+                          <td>
+                            <div className={`nx-status-line${d.status === "failed" ? " is-failed" : ""}`}>
+                              <span className={`nx-status-dot is-${d.status === "ready" || d.status === "failed" ? d.status : "active"}`} />
+                              <span>
+                                {STATUS_LABEL[d.status] || d.status} · {d.progress_step} {d.progress_pct}%
+                              </span>
+                            </div>
+                            <div className="nx-progress">
+                              <div
+                                className={`nx-progress-bar${d.status === "ready" ? " is-ready" : ""}${d.status === "failed" ? " is-failed" : ""}`}
+                                style={{ width: `${d.progress_pct}%` }}
+                              />
+                            </div>
+                            {d.error && <div className="nx-doc-error">{d.error}</div>}
+                          </td>
+                          <td className="nx-num">{d.chunk_count}</td>
+                          <td>
+                            <button
+                              className="nx-btn nx-btn-danger nx-btn-sm"
+                              onClick={() => removeDoc(d.id)}
+                              disabled={removingId === d.id}
+                            >
+                              {removingId === d.id ? "Removing…" : "Remove"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {tab === "internal" && (
+          <section>
+            <div className="nx-section-head">
+              <div>
+                <h2>Internal users</h2>
+                <p>Staff accounts with access to the full knowledge base.</p>
+              </div>
+            </div>
+            <div className="nx-card">
+              <form onSubmit={createUser} className="nx-form-inline">
+                <input
+                  className="nx-input"
+                  placeholder="Email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  required
+                />
+                <input
+                  className="nx-input"
+                  placeholder="Temporary password (12+ characters)"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  required
+                  minLength={12}
+                />
+                <button className="nx-btn nx-btn-primary" disabled={creatingUser}>
+                  {creatingUser ? "Creating…" : "Create"}
+                </button>
+              </form>
+
+              {internals.length === 0 ? (
+                <div className="nx-empty">
+                  <div className="nx-empty-mark">N</div>
+                  <p>No internal users yet.</p>
+                </div>
+              ) : (
+                <div className="nx-table-scroll">
+                  <table className="nx-table">
+                    <thead>
+                      <tr>
+                        <th>Email</th>
+                        <th>Active</th>
+                        <th>Queries</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {internals.map((u) => (
+                        <tr key={u.id}>
+                          <td className="nx-col-file">{u.email}</td>
+                          <td>
+                            <span className={`nx-yn ${u.is_active ? "is-yes" : "is-no"}`}>
+                              {u.is_active ? "Yes" : "No"}
+                            </span>
+                          </td>
+                          <td className="nx-num">{u.query_count}</td>
+                          <td>
+                            <button
+                              className="nx-btn nx-btn-ghost nx-btn-sm"
+                              onClick={() => toggleUser(u)}
+                              disabled={togglingId === u.id}
+                            >
+                              {togglingId === u.id ? "Working…" : u.is_active ? "Disable" : "Enable"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {tab === "external" && (
+          <section>
+            <div className="nx-section-head">
+              <div>
+                <h2>External visitors</h2>
+                <p>Visitor accounts with scoped access to public-facing content.</p>
+              </div>
+            </div>
+            <div className="nx-card">
+              {externals.length === 0 ? (
+                <div className="nx-empty">
+                  <div className="nx-empty-mark">N</div>
+                  <p>No external visitors yet.</p>
+                </div>
+              ) : (
+                <div className="nx-table-scroll">
+                  <table className="nx-table">
+                    <thead>
+                      <tr>
+                        <th>Email</th>
+                        <th>Last seen</th>
+                        <th>Queries</th>
+                        <th>Active</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {externals.map((u) => (
+                        <tr key={u.id}>
+                          <td className="nx-col-file">{u.email}</td>
+                          <td className="nx-num">{u.last_seen_at ? new Date(u.last_seen_at).toLocaleString() : "—"}</td>
+                          <td className="nx-num">{u.query_count}</td>
+                          <td>
+                            <span className={`nx-yn ${u.is_active ? "is-yes" : "is-no"}`}>
+                              {u.is_active ? "Yes" : "No"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
   );
 }
-
-const inp = {
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid var(--line)",
-  background: varPanel(),
-  color: "var(--text)",
-};
-function varPanel() {
-  return "#0e1116";
-}
-const btn = {
-  padding: "10px 14px",
-  borderRadius: 8,
-  border: "none",
-  background: "#1f6feb",
-  color: "white",
-  cursor: "pointer",
-};
-const table = { width: "100%", borderCollapse: "collapse" };
-const bar = { background: "#21262d", borderRadius: 99, overflow: "hidden", marginTop: 6 };

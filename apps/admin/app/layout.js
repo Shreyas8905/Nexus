@@ -1,6 +1,9 @@
 import "./globals.css";
 
-export const metadata = { title: "Nexus Admin" };
+export const metadata = {
+  title: "Nexus Admin",
+  description: "Administration console for knowledge base ingestion and access control.",
+};
 
 export default function RootLayout({ children }) {
   return (

@@ -1,26 +1,88 @@
 :root {
-  --bg: #0b0f14;
-  --bg-elev: #121820;
-  --line: rgba(212, 175, 106, 0.18);
-  --gold: #d4af6a;
-  --gold-2: #f0d9a6;
-  --text: #e8eef6;
-  --muted: #8b97a8;
-  --danger: #e07a6e;
-  --ok: #7dcea0;
-  --font: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
-  --sans: "Segoe UI", system-ui, sans-serif;
+  --paper: #f5f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef2f9;
+  --line: rgba(18, 42, 88, 0.12);
+  --line-strong: rgba(18, 42, 88, 0.22);
+
+  --cobalt: #0047ab;
+  --cobalt-deep: #0d3a82;
+  --cobalt-tint: rgba(0, 71, 171, 0.08);
+  --cobalt-tint-strong: rgba(0, 71, 171, 0.14);
+
+  --green: #14543c;
+  --green-2: #1c7350;
+  --green-tint: rgba(20, 84, 60, 0.09);
+
+  --text: #142033;
+  --muted: #5b6b80;
+  --danger: #a8321f;
+  --danger-tint: rgba(168, 50, 31, 0.08);
+
+  --font-serif:
+    "Source Serif Pro", "Iowan Old Style", "Palatino Linotype", Palatino,
+    Georgia, serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(212, 175, 106, 0.12), transparent 50%),
-    radial-gradient(900px 500px at 100% 0%, rgba(70, 110, 160, 0.12), transparent 45%),
-    var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
+  margin: 0;
+  min-height: 100%;
 }
 
-a { color: var(--gold); }
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--cobalt);
+}
+
+::selection {
+  background: var(--cobalt-tint-strong);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+input::placeholder {
+  color: #9aa7b8;
+}
+
+button {
+  font-family: var(--font-sans);
+}
+
+@keyframes nexus-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
