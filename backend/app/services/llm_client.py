@@ -74,12 +74,10 @@ async def generate(prompt: str, system: str, json_mode: bool = False) -> str:
             return r.json().get("response", "")
 
 async def generate_stream(prompt: str, system: str) -> AsyncIterator[str]:
-    print(f"DEBUG: Starting generate_stream with provider: {settings.llm_provider}")
     if settings.llm_provider == "groq":
         if not settings.groq_api_key:
             raise LLMError("Groq API key is not configured")
 
-        print(f"DEBUG: Calling Groq API with model: {settings.groq_llm_model}")
         client = AsyncGroq(api_key=settings.groq_api_key)
         try:
             stream = await client.chat.completions.create(
@@ -94,11 +92,8 @@ async def generate_stream(prompt: str, system: str) -> AsyncIterator[str]:
             async for chunk in stream:
                 content = chunk.choices[0].delta.content
                 if content:
-                    print(f"DEBUG: Received token: {content}", end="")
                     yield content
-            print("\nDEBUG: Stream completed successfully")
         except Exception as e:
-            print(f"DEBUG: Groq Stream Error: {str(e)}")
             raise LLMError(str(e))
         finally:
             await client.close()
