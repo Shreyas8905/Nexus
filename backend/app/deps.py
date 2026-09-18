@@ -23,6 +23,14 @@ def _site_from_request(request: Request) -> str:
     return "chat"
 
 
+def get_client_ip(request: Request) -> str:
+    if "X-Forwarded-For" in request.headers:
+        return request.headers["X-Forwarded-For"].split(",")[0].strip()
+    if "X-Real-IP" in request.headers:
+        return request.headers["X-Real-IP"]
+    return request.client.host if request.client else "127.0.0.1"
+
+
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
     require_csrf(request)
     site = _site_from_request(request)

@@ -104,6 +104,6 @@ def token_user_from_payload(payload: dict[str, Any]) -> TokenUser:
     )
 
 
-def cache_key(role: str, message: str, vis: str) -> str:
+def cache_key(role: str, message: str, vis: str, version: int = 1) -> str:
     digest = hashlib.sha256(f"{role}|{vis}|{message.strip().lower()}".encode()).hexdigest()
-    return f"nexus:ans:{digest}"
+    return f"nexus:ans:v{version}:{digest}"

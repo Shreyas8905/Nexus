@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import get_current_user, require_admin, _site_from_request
+from app.deps import get_current_user, require_admin, _site_from_request, get_client_ip
 from app.models import Role, User
 from app.schemas import (
     ChangePasswordRequest,
@@ -40,7 +40,7 @@ def _cookie_site(request: Request, intended: str) -> str:
 
 @router.post("/login")
 async def login(body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    if await rate_limit(f"rl:login:{request.client.host if request.client else 'x'}", 20, 60):
+    if await rate_limit(f"rl:login:{get_client_ip(request)}", 20, 60):
         raise HTTPException(429, "Too many login attempts")
     site = _cookie_site(request, "auto")
     result = await db.execute(select(User).where(User.email == str(body.email).lower()))
@@ -70,7 +70,7 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
 @router.post("/admin/login")
 async def admin_login(body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     request.state.force_site = "admin"
-    if await rate_limit(f"rl:adminlogin:{request.client.host if request.client else 'x'}", 20, 60):
+    if await rate_limit(f"rl:adminlogin:{get_client_ip(request)}", 20, 60):
         raise HTTPException(429, "Too many login attempts")
     result = await db.execute(select(User).where(User.email == str(body.email).lower()))
     user = result.scalar_one_or_none()
@@ -97,7 +97,7 @@ async def admin_login(body: LoginRequest, request: Request, response: Response, 
 
 @router.post("/external")
 async def external_start(body: ExternalStartRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    if await rate_limit(f"rl:ext:{request.client.host if request.client else 'x'}", 30, 60):
+    if await rate_limit(f"rl:ext:{get_client_ip(request)}", 30, 60):
         raise HTTPException(429, "Too many requests")
     email = str(body.email).lower()
     result = await db.execute(select(User).where(User.email == email))

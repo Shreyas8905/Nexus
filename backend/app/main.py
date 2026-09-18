@@ -38,13 +38,28 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Nexus API", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+
+cors_origins = settings.cors_list
+if settings.cookie_secure and "*" in cors_origins:
+    cors_origins = [o for o in cors_origins if o != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_list,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-CSRF-Token", "X-Nexus-Site"],
 )
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    if settings.cookie_secure:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 # Create a master router for all API endpoints to support /api prefix
 api_router = APIRouter(prefix="/api")

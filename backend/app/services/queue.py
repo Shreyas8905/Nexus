@@ -18,9 +18,8 @@ async def set_cached(key: str, value: str, ttl: int = 3600) -> None:
 
 
 async def invalidate_cache() -> None:
-    r = get_redis()
-    async for key in r.scan_iter("nexus:ans:*"):
-        await r.delete(key)
+    from app.services.redis_client import increment_cache_version
+    await increment_cache_version()
 
 
 async def rate_limit(key: str, limit: int, window: int) -> bool:

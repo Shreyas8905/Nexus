@@ -16,6 +16,7 @@ from app.services.audit import audit
 from app.services.guardrails import REFUSAL, input_guard, scrub_output
 from app.services.llm_client import generate_stream
 from app.services.queue import get_cached, rate_limit, set_cached
+from app.services.redis_client import get_cache_version
 from app.services.retrieve import retrieve
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -53,7 +54,8 @@ async def chat_stream(body: ChatRequest, user: User = Depends(get_current_user),
         return StreamingResponse(refused(), media_type="text/event-stream")
 
     vis = "all" if user.role == Role.internal else "generic"
-    key = cache_key(user.role.value, body.message, vis)
+    version = await get_cache_version()
+    key = cache_key(user.role.value, body.message, vis, version)
     cached = await get_cached(key)
     show_cite = user.role == Role.internal
 
