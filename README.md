@@ -12,23 +12,7 @@
 ### System Design
 Nexus follows a decoupled microservices architecture to ensure high availability and scalability.
 
-```mermaid
-graph TD
-    User((User)) -->|HTTP| Caddy[Caddy Proxy]
-    Caddy -->|Proxy /api| API[FastAPI Backend]
-    Caddy -->|Proxy /| Frontends[Next.js Apps]
-    
-    API -->|Read/Write| Postgres[(PostgreSQL)]
-    API -->|Queue Tasks| Redis[(Redis)]
-    API -->|Vector Search| Qdrant[(Qdrant DB)]
-    
-    Worker[Ingestion Worker] -->|Polls| Redis
-    Worker -->|Embeddings| Ollama[Ollama Engine]
-    Worker -->|Store Vectors| Qdrant
-    
-    API -->|Chat Generation| Groq[Groq Cloud API]
-    API -->|Vision/Embeddings| Gemini[Gemini API / Ollama]
-```
+![Architecture Diagram](arch.png)
 
 ### Architectural Decisions
 
