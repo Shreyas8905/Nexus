@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
-from typing import List
+from typing import List, Literal
+from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.engine.url import make_url
@@ -21,7 +23,9 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
 
     jwt_secret: str = "dev-only-change-me"
-    cookie_secure: bool = False
+    # None -> derive from ENV (Secure everywhere except development).
+    cookie_secure: bool | None = None
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     chat_cookie: str = "nexus_chat"
     admin_cookie: str = "nexus_admin"
     csrf_cookie: str = "nexus_csrf"
@@ -35,6 +39,10 @@ class Settings(BaseSettings):
     chat_origin: str = "http://localhost:8080"
     admin_origin: str = "http://localhost:8081"
     api_cors_origins: str = "http://localhost:8080,http://localhost:8081"
+
+    # Comma-separated IPs/CIDRs of reverse proxies allowed to set X-Forwarded-For / X-Real-IP.
+    # Empty (default) means forwarded headers are never trusted.
+    trusted_proxies: str = ""
 
     llm_provider: str = "ollama"
     groq_api_key: str | None = None
@@ -50,9 +58,58 @@ class Settings(BaseSettings):
     upload_dir: str = "/data/uploads"
     max_upload_mb: int = 50
 
+    @field_validator("cookie_samesite", mode="before")
+    @classmethod
+    def _normalize_samesite(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _validate_trusted_proxies(cls, value: str) -> str:
+        for entry in value.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                ipaddress.ip_network(entry, strict=False)
+            except ValueError as exc:
+                raise ValueError(f"TRUSTED_PROXIES contains an invalid IP/CIDR: {entry!r}") from exc
+        return value
+
+    @property
+    def is_development(self) -> bool:
+        return self.env.strip().lower() == "development"
+
+    @property
+    def cookie_secure_effective(self) -> bool:
+        return self.cookie_secure if self.cookie_secure is not None else not self.is_development
+
+    @model_validator(mode="after")
+    def validate_cookie_and_cors_config(self) -> Settings:
+        # Credentials (cookies) are always shared cross-origin, so a wildcard origin is never valid.
+        if "*" in self.cors_list:
+            raise ValueError("API_CORS_ORIGINS must list explicit origins; '*' is not allowed with credentials")
+        for origin in self.cors_list:
+            parts = urlsplit(origin)
+            if parts.scheme not in ("http", "https") or not parts.netloc or parts.path not in ("", "/") or parts.query or parts.fragment:
+                raise ValueError(f"API_CORS_ORIGINS entry must be a bare origin like https://host: {origin!r}")
+
+        if self.cookie_samesite == "none" and not self.cookie_secure_effective:
+            raise ValueError("COOKIE_SAMESITE=none requires secure cookies (COOKIE_SECURE=true)")
+
+        if not self.is_development:
+            if not self.cookie_secure_effective:
+                raise ValueError("COOKIE_SECURE must not be disabled outside development")
+            if not self.cors_list:
+                raise ValueError("API_CORS_ORIGINS must be set outside development")
+            insecure = [o for o in self.cors_list if urlsplit(o).scheme != "https"]
+            if insecure:
+                raise ValueError(f"API_CORS_ORIGINS must use https outside development: {insecure}")
+        return self
+
     @model_validator(mode="after")
     def validate_secure_non_dev_config(self) -> Settings:
-        if self.env.lower() == "development":
+        if self.is_development:
             return self
 
         insecure_values = {
@@ -92,7 +149,13 @@ class Settings(BaseSettings):
 
     @property
     def cors_list(self) -> List[str]:
-        return [o.strip() for o in self.api_cors_origins.split(",") if o.strip()]
+        return [o.strip().rstrip("/") for o in self.api_cors_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_proxy_networks(self) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+        return tuple(
+            ipaddress.ip_network(e.strip(), strict=False) for e in self.trusted_proxies.split(",") if e.strip()
+        )
 
 
 @lru_cache

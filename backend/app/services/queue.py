@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.redis_client import get_redis
+from app.services.redis_client import bump_answer_version, get_redis
 
 QUEUE_KEY = "nexus:ingest"
 
@@ -18,9 +18,8 @@ async def set_cached(key: str, value: str, ttl: int = 3600) -> None:
 
 
 async def invalidate_cache() -> None:
-    r = get_redis()
-    async for key in r.scan_iter("nexus:ans:*"):
-        await r.delete(key)
+    """Drop all cached answers by bumping the namespace version (O(1), no keyspace scan)."""
+    await bump_answer_version()
 
 
 async def rate_limit(key: str, limit: int, window: int) -> bool:

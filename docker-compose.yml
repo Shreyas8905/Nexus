@@ -169,6 +169,10 @@ services:
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+    environment:
+      CHAT_SITE_ADDRESS: ${CHAT_SITE_ADDRESS:-http://localhost:8080}
+      ADMIN_SITE_ADDRESS: ${ADMIN_SITE_ADDRESS:-http://localhost:8081}
+      HSTS_VALUE: ${HSTS_VALUE:-max-age=0}
     depends_on:
       - chat
       - admin

@@ -2,35 +2,48 @@
 	admin off
 }
 
-http://localhost:8080 {
-	encode gzip
+# --- Shared snippets ---------------------------------------------------------
+# HSTS is off (max-age=0) for the default plain-HTTP localhost setup so browsers never pin
+# localhost to HTTPS. For production set HSTS_VALUE="max-age=31536000; includeSubDomains" and
+# the *_SITE_ADDRESS variables below to real hostnames (Caddy then provisions TLS itself).
+(security_headers) {
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
-		Strict-Transport-Security "max-age=0"
+		Strict-Transport-Security "{$HSTS_VALUE:max-age=0}"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
+		-X-Powered-By
 	}
+}
+
+# This Caddy is the edge: Caddy already replaces client-supplied X-Forwarded-For from untrusted
+# peers, and we also set X-Real-IP so the API sees only the address Caddy itself observed. If another proxy/CDN sits in front of Caddy,
+# configure `servers { trusted_proxies ... }` and use {client_ip} here instead.
+(api_proxy) {
+	reverse_proxy api:8000 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# --- Sites -------------------------------------------------------------------
+{$CHAT_SITE_ADDRESS:http://localhost:8080} {
+	encode gzip
+	import security_headers
 	handle /api/* {
-		reverse_proxy api:8000
+		import api_proxy
 	}
 	handle {
 		reverse_proxy chat:3000
 	}
 }
 
-http://localhost:8081 {
+{$ADMIN_SITE_ADDRESS:http://localhost:8081} {
 	encode gzip
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
-		Referrer-Policy no-referrer
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		-Server
-	}
+	import security_headers
 	handle /api/* {
-		reverse_proxy api:8000
+		import api_proxy
 	}
 	handle {
 		reverse_proxy admin:3001

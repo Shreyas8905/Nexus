@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,69 @@ from app.schemas import TokenUser
 from app.security import cookie_name, decode_token, require_csrf, token_user_from_payload
 
 settings = get_settings()
+
+_IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
+
+def _parse_ip(raw: str | None) -> _IPAddress | None:
+    """Parse an address from a header or socket peer, tolerating ports and IPv6 brackets."""
+    if not raw:
+        return None
+    raw = raw.strip().strip('"')
+    if raw.startswith("["):  # [::1] or [::1]:443
+        raw = raw[1:].split("]", 1)[0]
+    elif raw.count(":") == 1:  # 1.2.3.4:5678
+        raw = raw.split(":", 1)[0]
+    try:
+        addr = ipaddress.ip_address(raw)
+    except ValueError:
+        return None
+    # Unwrap ::ffff:a.b.c.d so one client isn't seen as two identities.
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        return addr.ipv4_mapped
+    return addr
+
+
+def _is_trusted(addr: _IPAddress) -> bool:
+    return any(addr in net for net in settings.trusted_proxy_networks)
+
+
+def get_client_ip(request: Request) -> str:
+    """Resolve the real client IP, honouring forwarded headers only from trusted proxies.
+
+    The socket peer is authoritative unless it is in TRUSTED_PROXIES. For a trusted peer,
+    X-Forwarded-For is walked right-to-left (the end appended by our own proxies is the only
+    part a client can't forge), skipping further trusted hops; the first untrusted address is
+    the client. X-Real-IP is the fallback. Anything unparsable is ignored, never trusted.
+    """
+    peer = _parse_ip(request.client.host if request.client else None)
+    if peer is None:
+        return "unknown"
+    if not _is_trusted(peer):
+        return str(peer)
+
+    for hop in reversed(request.headers.get("x-forwarded-for", "").split(",")):
+        addr = _parse_ip(hop)
+        if addr is None:
+            # Malformed hop: stop rather than skip past it to an attacker-controlled value.
+            break
+        if not _is_trusted(addr):
+            return str(addr)
+
+    real_ip = _parse_ip(request.headers.get("x-real-ip"))
+    if real_ip is not None and not _is_trusted(real_ip):
+        return str(real_ip)
+    return str(peer)
+
+
+def client_rate_key(request: Request) -> str:
+    """Stable rate-limit identity: IPv4 as-is, IPv6 collapsed to its /64 (a single subscriber
+    controls a whole /64, so per-address limits are trivially evaded)."""
+    ip = get_client_ip(request)
+    addr = _parse_ip(ip)
+    if isinstance(addr, ipaddress.IPv6Address):
+        return str(ipaddress.ip_network(f"{addr}/64", strict=False).network_address) + "/64"
+    return ip
 
 
 def _site_from_request(request: Request) -> str:

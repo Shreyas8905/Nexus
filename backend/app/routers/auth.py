@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
-from app.deps import get_current_user, require_admin, _site_from_request
+from app.deps import _site_from_request, client_rate_key, get_client_ip, get_current_user, require_admin
 from app.models import Role, User
 from app.schemas import (
     ChangePasswordRequest,
@@ -40,7 +40,7 @@ def _cookie_site(request: Request, intended: str) -> str:
 
 @router.post("/login")
 async def login(body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    if await rate_limit(f"rl:login:{request.client.host if request.client else 'x'}", 20, 60):
+    if await rate_limit(f"rl:login:{client_rate_key(request)}", 20, 60):
         raise HTTPException(429, "Too many login attempts")
     site = _cookie_site(request, "auto")
     result = await db.execute(select(User).where(User.email == str(body.email).lower()))
@@ -63,14 +63,14 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
         site,
     )
     set_session_cookies(response, token, csrf, site)
-    await audit(db, "login", user.id, site=site)
+    await audit(db, "login", user.id, site=site, ip=get_client_ip(request))
     return {"user": UserOut.model_validate(user), "csrf": csrf}
 
 
 @router.post("/admin/login")
 async def admin_login(body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     request.state.force_site = "admin"
-    if await rate_limit(f"rl:adminlogin:{request.client.host if request.client else 'x'}", 20, 60):
+    if await rate_limit(f"rl:adminlogin:{client_rate_key(request)}", 20, 60):
         raise HTTPException(429, "Too many login attempts")
     result = await db.execute(select(User).where(User.email == str(body.email).lower()))
     user = result.scalar_one_or_none()
@@ -91,13 +91,13 @@ async def admin_login(body: LoginRequest, request: Request, response: Response, 
         "admin",
     )
     set_session_cookies(response, token, csrf, "admin")
-    await audit(db, "login", user.id, site="admin")
+    await audit(db, "login", user.id, site="admin", ip=get_client_ip(request))
     return {"user": UserOut.model_validate(user), "csrf": csrf}
 
 
 @router.post("/external")
 async def external_start(body: ExternalStartRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    if await rate_limit(f"rl:ext:{request.client.host if request.client else 'x'}", 30, 60):
+    if await rate_limit(f"rl:ext:{client_rate_key(request)}", 30, 60):
         raise HTTPException(429, "Too many requests")
     email = str(body.email).lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -116,7 +116,7 @@ async def external_start(body: ExternalStartRequest, request: Request, response:
     csrf = new_csrf()
     token = create_token(TokenUser(id=user.id, email=user.email, role=user.role), "chat")
     set_session_cookies(response, token, csrf, "chat")
-    await audit(db, "external_start", user.id)
+    await audit(db, "external_start", user.id, ip=get_client_ip(request))
     return {"user": UserOut.model_validate(user), "csrf": csrf}
 
 

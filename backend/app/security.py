@@ -15,6 +15,7 @@ from fastapi import HTTPException, Request, Response, status
 from app.config import get_settings
 from app.models import Role
 from app.schemas import TokenUser
+from app.services.redis_client import ANSWER_NS
 
 ph = PasswordHasher()
 settings = get_settings()
@@ -59,31 +60,24 @@ def cookie_name(site: str) -> str:
     return settings.admin_cookie if site == "admin" else settings.chat_cookie
 
 
+SESSION_MAX_AGE = 12 * 3600
+
+
+def _cookie_attrs() -> dict[str, Any]:
+    # Secure/SameSite come from settings so set and delete always emit matching attributes
+    # (browsers ignore a delete whose attributes don't match, and reject SameSite=None without Secure).
+    return {"secure": settings.cookie_secure_effective, "samesite": settings.cookie_samesite, "path": "/"}
+
+
 def set_session_cookies(response: Response, token: str, csrf: str, site: str) -> None:
-    secure = settings.cookie_secure
-    response.set_cookie(
-        cookie_name(site),
-        token,
-        httponly=True,
-        secure=secure,
-        samesite="lax",
-        max_age=12 * 3600,
-        path="/",
-    )
-    response.set_cookie(
-        settings.csrf_cookie,
-        csrf,
-        httponly=False,
-        secure=secure,
-        samesite="lax",
-        max_age=12 * 3600,
-        path="/",
-    )
+    response.set_cookie(cookie_name(site), token, httponly=True, max_age=SESSION_MAX_AGE, **_cookie_attrs())
+    # The CSRF token must stay readable by JS (double-submit pattern), hence not HttpOnly.
+    response.set_cookie(settings.csrf_cookie, csrf, httponly=False, max_age=SESSION_MAX_AGE, **_cookie_attrs())
 
 
 def clear_session(response: Response, site: str) -> None:
-    response.delete_cookie(cookie_name(site), path="/")
-    response.delete_cookie(settings.csrf_cookie, path="/")
+    response.delete_cookie(cookie_name(site), httponly=True, **_cookie_attrs())
+    response.delete_cookie(settings.csrf_cookie, httponly=False, **_cookie_attrs())
 
 
 def require_csrf(request: Request) -> None:
@@ -104,6 +98,8 @@ def token_user_from_payload(payload: dict[str, Any]) -> TokenUser:
     )
 
 
-def cache_key(role: str, message: str, vis: str) -> str:
+def cache_key(role: str, message: str, vis: str, version: int) -> str:
+    """Answer-cache key. ``version`` is the namespace version read *before* retrieval, so an
+    answer computed across an invalidation is written to a dead namespace instead of going stale."""
     digest = hashlib.sha256(f"{role}|{vis}|{message.strip().lower()}".encode()).hexdigest()
-    return f"nexus:ans:{digest}"
+    return f"{ANSWER_NS}:v{version}:{digest}"

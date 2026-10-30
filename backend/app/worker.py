@@ -5,7 +5,7 @@ import logging
 
 from app.db import engine, Base
 from app.services.qdrant_store import ensure_collection
-from app.services.queue import QUEUE_KEY
+from app.services.queue import QUEUE_KEY, invalidate_cache
 from app.services.redis_client import get_redis
 from app.services.ingest import ingest_document
 
@@ -29,6 +29,9 @@ async def main() -> None:
             await ingest_document(doc_id)
         except Exception:
             log.exception("failed ingest %s", doc_id)
+        finally:
+            # Even a partial/failed re-ingest can change the index, so never leave stale answers.
+            await invalidate_cache()
 
 
 if __name__ == "__main__":
