@@ -43,15 +43,19 @@ JWT_SECRET=your-secure-secret
    cd backend
    pip install -r requirements.txt
    ```
-2. **Pull Embedding Model**:
+2. **Apply Database Migrations**:
+   ```bash
+   alembic upgrade head
+   ```
+3. **Pull Embedding Model**:
    ```bash
    ollama pull nomic-embed-text
    ```
-3. **Start API**:
+4. **Start API**:
    ```bash
    uvicorn app.main:app --reload --port 8000
    ```
-4. **Start Worker** (In a NEW terminal window):
+5. **Start Worker** (In a NEW terminal window):
    ```bash
    cd backend
    python -m app.worker

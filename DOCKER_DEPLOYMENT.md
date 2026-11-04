@@ -43,6 +43,12 @@ JWT_SECRET=your_long_random_secret
 
 ### 2. Launching the Stack
 
+Apply the database schema before starting the API and worker:
+
+```bash
+docker compose run --rm api alembic upgrade head
+```
+
 ### GPU Deployment (Recommended)
 For production-grade performance, use the GPU override file. This requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed on the host.
 

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.db import Base, engine, SessionLocal
+from app.db import SessionLocal
 from app.models import Role, User
 from app.routers import admin_docs, admin_users, auth, chat
 from app.security import hash_password
@@ -18,8 +18,6 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     async with SessionLocal() as db:
         existing = await db.execute(select(User).where(User.role == Role.admin))
         if existing.scalar_one_or_none() is None:
