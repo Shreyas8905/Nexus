@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.db import engine, Base
 from app.services.qdrant_store import ensure_collection
 from app.services.queue import QUEUE_KEY
 from app.services.redis_client import get_redis
@@ -14,8 +13,6 @@ log = logging.getLogger("nexus.worker")
 
 
 async def main() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     ensure_collection()
     r = get_redis()
     log.info("ingestion worker listening on %s", QUEUE_KEY)

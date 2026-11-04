@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
@@ -79,14 +79,12 @@ async def upload(
 
 @router.patch("/{doc_id}/visibility", response_model=DocumentOut)
 async def override_visibility(
-    doc_id: str,
+    doc_id: UUID,
     body: VisibilityOverride,
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    from uuid import UUID
-
-    doc = await db.get(Document, UUID(doc_id))
+    doc = await db.get(Document, doc_id)
     if not doc:
         raise HTTPException(404, "Not found")
     doc.visibility = body.visibility
@@ -100,14 +98,11 @@ async def override_visibility(
 
 
 @router.delete("/{doc_id}")
-async def remove_doc(doc_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    from uuid import UUID
-
-    uid = UUID(doc_id)
-    doc = await db.get(Document, uid)
+async def remove_doc(doc_id: UUID, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
     if not doc:
         raise HTTPException(404, "Not found")
-    delete_document(uid)
+    delete_document(doc_id)
     try:
         os.remove(doc.storage_path)
     except OSError:

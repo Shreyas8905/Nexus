@@ -121,6 +121,13 @@ export default function Page() {
         headers: { "Content-Type": "application/json", "X-CSRF-Token": getCsrf() },
         body: JSON.stringify({ message: text }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Unable to process the request");
+      }
+      if (!res.body) {
+        throw new Error("The server returned an empty response");
+      }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
