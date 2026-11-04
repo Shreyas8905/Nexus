@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_llm_model: str = "llama-3.1-70b-versatile"
     gemini_api_key: str | None = None
+    gemini_vision_model: str = "gemini-1.5-flash"
+
+    # LLM resilience: timeouts, retries and fallback routing (see services/llm_client.py)
+    llm_timeout_seconds: float = Field(default=180.0, gt=0)
+    llm_connect_timeout_seconds: float = Field(default=10.0, gt=0)
+    llm_max_retries: int = Field(default=2, ge=0, le=10)
+    llm_retry_backoff_seconds: float = Field(default=0.5, ge=0)
+    groq_fallback_models: str = "llama-3.1-8b-instant"
+    llm_fallback_to_ollama: bool = True
+    log_level: str = "INFO"
 
     ollama_llm_model: str = "qwen2.5:7b-instruct-q4_K_M"
     ollama_embed_model: str = "nomic-embed-text"
@@ -89,6 +99,10 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must include non-default credentials outside development")
 
         return self
+
+    @property
+    def groq_fallback_model_list(self) -> List[str]:
+        return [m.strip() for m in self.groq_fallback_models.split(",") if m.strip()]
 
     @property
     def cors_list(self) -> List[str]:

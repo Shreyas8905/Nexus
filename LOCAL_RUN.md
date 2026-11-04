@@ -81,3 +81,13 @@ Available at: `http://localhost:3001`
   - **Generation**: Handled by Groq API for speed and quality.
   - **Vision**: Handled by Google Gemini API.
   - **Embeddings**: Handled by local Ollama for stability and zero-cost.
+- **Resilience & Logging** (`backend/app/services/llm_client.py`):
+  - Every LLM call logs one JSON line on the `nexus.llm` logger (`provider`, `model`, `latency_ms`, token counts, `error_type`). Prompts and API keys are never logged.
+  - Rate-limit, timeout and "service down" errors are retried with exponential backoff (`LLM_MAX_RETRIES`, `LLM_RETRY_BACKOFF_SECONDS`), then routed to `GROQ_FALLBACK_MODELS` and finally to local Ollama (`LLM_FALLBACK_TO_OLLAMA`).
+
+## Running Backend Tests
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
