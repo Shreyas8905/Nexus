@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, APIRouter
@@ -14,6 +15,13 @@ from app.security import hash_password
 from app.services.qdrant_store import ensure_collection
 
 settings = get_settings()
+
+# Uvicorn only configures its own loggers; without this, application loggers
+# such as "nexus.llm" (structured LLM call logs) would be dropped.
+logging.basicConfig(
+    level=settings.log_level.upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 @asynccontextmanager
